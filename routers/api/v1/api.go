@@ -1360,6 +1360,10 @@ func Routes() *web.Router {
 						Delete(mustNotBeArchived, repo.DeletePushMirrorByRemoteName).
 						Get(repo.GetPushMirrorByName)
 				}, reqAdmin(), reqToken())
+				m.Group("/pull_mirror", func() {
+					m.Combo("").Get(repo.GetPullMirror).
+						Post(mustNotBeArchived, bind(api.ChangePullMirrorOption{}), repo.ChangePullMirror)
+				}, reqAdmin(), reqToken())
 
 				m.Get("/editorconfig/{filename}", context.ReferencesGitRepo(), context.RepoRefForAPI, reqRepoReader(unit.TypeCode), repo.GetEditorconfig)
 				m.Group("/pulls", func() {

@@ -12,6 +12,7 @@ import (
 	repo_model "code.gitea.io/gitea/models/repo"
 	"code.gitea.io/gitea/models/unit"
 	"code.gitea.io/gitea/modules/git"
+	"code.gitea.io/gitea/modules/lfs"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/util"
@@ -387,6 +388,205 @@ func CreatePushMirror(ctx *context.APIContext, mirrorOption *api.CreatePushMirro
 		return
 	}
 	m, err := convert.ToPushMirror(ctx, pushMirror)
+	if err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+	ctx.JSON(http.StatusOK, m)
+}
+
+func ChangePullMirror(ctx *context.APIContext) {
+	// swagger:operation POST /repos/{owner}/{repo}/pull_mirror repository repoChangePullMirror
+	// ---
+	// summary: Changes the pull mirror of the repository
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: owner
+	//   in: path
+	//   description: owner of the repo
+	//   type: string
+	//   required: true
+	// - name: repo
+	//   in: path
+	//   description: name of the repo
+	//   type: string
+	//   required: true
+	// - name: body
+	//   in: body
+	//   description: pull mirror options
+	//   required: true
+	//   schema:
+	//     "$ref": "#/definitions/ChangePullMirrorOption"
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/PullMirror"
+	//   "400":
+	//     "$ref": "#/responses/error"
+	//   "403":
+	//     "$ref": "#/responses/forbidden"
+	//   "404":
+	//     "$ref": "#/responses/notFound"
+
+	form := web.GetForm(ctx).(*api.ChangePullMirrorOption)
+	repo := ctx.Repo.Repository
+
+	if !setting.Mirror.Enabled {
+		ctx.APIError(http.StatusBadRequest, "Mirror feature is disabled")
+		return
+	}
+
+	if !repo.IsMirror {
+		ctx.APIError(http.StatusBadRequest, "Repository is not a mirror")
+		return
+	}
+
+	if repo.IsArchived {
+		ctx.APIError(http.StatusBadRequest, "Repository is archived")
+		return
+	}
+
+	pullMirror, err := repo_model.GetMirrorByRepoID(ctx, ctx.Repo.Repository.ID)
+	if err == repo_model.ErrMirrorNotExist {
+		ctx.APIError(http.StatusNotFound, "Pull mirror does not exist")
+		return
+	}
+	if err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+
+	interval, err := time.ParseDuration(form.Interval)
+	if err != nil || (interval != 0 && interval < setting.Mirror.MinInterval) {
+		ctx.APIError(http.StatusBadRequest, "Invalid interval")
+		return
+	}
+
+	pullMirror.EnablePrune = form.EnablePrune
+	pullMirror.Interval = interval
+	pullMirror.ScheduleNextUpdate()
+	if err := repo_model.UpdateMirror(ctx, pullMirror); err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+
+	u, err := git.GetRemoteURL(ctx, ctx.Repo.Repository.RepoPath(), pullMirror.GetRemoteName())
+	if err != nil {
+		ctx.APIError(http.StatusBadRequest, "Invalid remote URL")
+		return
+	}
+	if u.User != nil && form.MirrorPassword == "" && form.MirrorUsername == u.User.Username() {
+		form.MirrorPassword, _ = u.User.Password()
+	}
+
+	address, err := git.ParseRemoteAddr(form.MirrorAddress, form.MirrorUsername, form.MirrorPassword)
+	if err == nil {
+		err = migrations.IsMigrateURLAllowed(address, ctx.Doer)
+	}
+	if err != nil {
+		ctx.APIError(http.StatusBadRequest, "Invalid remote address")
+		return
+	}
+
+	if err := mirror_service.UpdateAddress(ctx, pullMirror, address); err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+
+	remoteAddress, err := util.SanitizeURL(form.MirrorAddress)
+	if err != nil {
+		ctx.APIError(http.StatusBadRequest, "Invalid remote address")
+		return
+	}
+	pullMirror.RemoteAddress = remoteAddress
+
+	form.LFS = form.LFS && setting.LFS.StartServer
+
+	if len(form.LFSEndpoint) > 0 {
+		ep := lfs.DetermineEndpoint("", form.LFSEndpoint)
+		if ep == nil {
+			ctx.APIError(http.StatusBadRequest, "Invalid LFS endpoint")
+			return
+		}
+		err = migrations.IsMigrateURLAllowed(ep.String(), ctx.Doer)
+		if err != nil {
+			ctx.APIError(http.StatusBadRequest, "Invalid LFS endpoint")
+			return
+		}
+	}
+
+	pullMirror.LFS = form.LFS
+	pullMirror.LFSEndpoint = form.LFSEndpoint
+	if err := repo_model.UpdateMirror(ctx, pullMirror); err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+
+	m, err := convert.ToPullMirror(ctx, pullMirror)
+	if err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+	ctx.JSON(http.StatusOK, m)
+}
+
+// GetPullMirror gets the pull mirror of a repository
+func GetPullMirror(ctx *context.APIContext) {
+	// swagger:operation GET /repos/{owner}/{repo}/pull_mirror repository repoGetPullMirror
+	// ---
+	// summary: Get pull mirror of the repository
+	// produces:
+	// - application/json
+	// parameters:
+	// - name: owner
+	//   in: path
+	//   description: owner of the repo
+	//   type: string
+	//   required: true
+	// - name: repo
+	//   in: path
+	//   description: name of the repo
+	//   type: string
+	//   required: true
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/PullMirror"
+	//   "400":
+	//     "$ref": "#/responses/error"
+	//   "403":
+	//     "$ref": "#/responses/forbidden"
+	//   "404":
+	//     "$ref": "#/responses/notFound"
+
+	repo := ctx.Repo.Repository
+
+	if !setting.Mirror.Enabled {
+		ctx.APIError(http.StatusBadRequest, "Mirror feature is disabled")
+		return
+	}
+
+	if !repo.IsMirror {
+		ctx.APIError(http.StatusBadRequest, "Repository is not a mirror")
+		return
+	}
+
+	if repo.IsArchived {
+		ctx.APIError(http.StatusBadRequest, "Repository is archived")
+		return
+	}
+
+	// Gets the pull mirror
+	pullMirror, err := repo_model.GetMirrorByRepoID(ctx, ctx.Repo.Repository.ID)
+	if err == repo_model.ErrMirrorNotExist {
+		ctx.APIError(http.StatusNotFound, "Pull mirror does not exist")
+		return
+	}
+	if err != nil {
+		ctx.APIErrorInternal(err)
+		return
+	}
+
+	m, err := convert.ToPullMirror(ctx, pullMirror)
 	if err != nil {
 		ctx.APIErrorInternal(err)
 		return

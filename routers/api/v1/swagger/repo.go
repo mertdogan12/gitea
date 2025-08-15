@@ -400,6 +400,13 @@ type swaggerWikiCommitList struct {
 	Body api.WikiCommitList `json:"body"`
 }
 
+// PullMirror
+// swagger:response PullMirror
+type swaggerPullMirror struct {
+	// in:body
+	Body api.PullMirror `json:"body"`
+}
+
 // PushMirror
 // swagger:response PushMirror
 type swaggerPushMirror struct {

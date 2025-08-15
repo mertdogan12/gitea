@@ -197,6 +197,9 @@ type swaggerParameterBodies struct {
 	CreatePushMirrorOption api.CreatePushMirrorOption
 
 	// in:body
+	ChangePullMirrorOption api.ChangePullMirrorOption
+
+	// in:body
 	UpdateUserAvatarOptions api.UpdateUserAvatarOption
 
 	// in:body

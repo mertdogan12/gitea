@@ -13411,6 +13411,97 @@
         }
       }
     },
+    "/repos/{owner}/{repo}/pull_mirror": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "repository"
+        ],
+        "summary": "Get pull mirror of the repository",
+        "operationId": "repoGetPullMirror",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "owner of the repo",
+            "name": "owner",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "name of the repo",
+            "name": "repo",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/PullMirror"
+          },
+          "400": {
+            "$ref": "#/responses/error"
+          },
+          "403": {
+            "$ref": "#/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/responses/notFound"
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "repository"
+        ],
+        "summary": "Changes the pull mirror of the repository",
+        "operationId": "repoChangePullMirror",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "owner of the repo",
+            "name": "owner",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "name of the repo",
+            "name": "repo",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "pull mirror options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ChangePullMirrorOption"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/PullMirror"
+          },
+          "400": {
+            "$ref": "#/responses/error"
+          },
+          "403": {
+            "$ref": "#/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/responses/notFound"
+          }
+        }
+      }
+    },
     "/repos/{owner}/{repo}/pulls": {
       "get": {
         "produces": [
@@ -21970,6 +22061,41 @@
       },
       "x-go-package": "code.gitea.io/gitea/modules/structs"
     },
+    "ChangePullMirrorOption": {
+      "type": "object",
+      "title": "ChangePullMirrorOption represents need information to change a pull mirror of a repository.",
+      "properties": {
+        "enable_prune": {
+          "type": "boolean",
+          "x-go-name": "EnablePrune"
+        },
+        "interval": {
+          "type": "string",
+          "x-go-name": "Interval"
+        },
+        "lfs": {
+          "type": "boolean",
+          "x-go-name": "LFS"
+        },
+        "lfs_endpoint": {
+          "type": "string",
+          "x-go-name": "LFSEndpoint"
+        },
+        "mirror_address": {
+          "type": "string",
+          "x-go-name": "MirrorAddress"
+        },
+        "mirror_password": {
+          "type": "string",
+          "x-go-name": "MirrorPassword"
+        },
+        "mirror_username": {
+          "type": "string",
+          "x-go-name": "MirrorUsername"
+        }
+      },
+      "x-go-package": "code.gitea.io/gitea/modules/structs"
+    },
     "ChangedFile": {
       "description": "ChangedFile store information about files affected by the pull request",
       "type": "object",
@@ -26655,6 +26781,42 @@
       },
       "x-go-package": "code.gitea.io/gitea/modules/structs"
     },
+    "PullMirror": {
+      "description": "PullMirror represents information of a pull mirror",
+      "type": "object",
+      "properties": {
+        "enable_prune": {
+          "type": "boolean",
+          "x-go-name": "EnablePrune"
+        },
+        "interval": {
+          "type": "string",
+          "x-go-name": "Interval"
+        },
+        "lfs": {
+          "type": "boolean",
+          "x-go-name": "LFS"
+        },
+        "lfs_endpoint": {
+          "type": "string",
+          "x-go-name": "LFSEndpoint"
+        },
+        "mirror_address": {
+          "type": "string",
+          "x-go-name": "MirrorAddress"
+        },
+        "next_update": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "NextUpdateUnix"
+        },
+        "repo_name": {
+          "type": "string",
+          "x-go-name": "RepoName"
+        }
+      },
+      "x-go-package": "code.gitea.io/gitea/modules/structs"
+    },
     "PullRequest": {
       "description": "PullRequest represents a pull request",
       "type": "object",
@@ -29244,6 +29406,12 @@
         "items": {
           "$ref": "#/definitions/PublicKey"
         }
+      }
+    },
+    "PullMirror": {
+      "description": "PullMirror",
+      "schema": {
+        "$ref": "#/definitions/PullMirror"
       }
     },
     "PullRequest": {

@@ -24,3 +24,17 @@ func ToPushMirror(ctx context.Context, pm *repo_model.PushMirror) (*api.PushMirr
 		SyncOnCommit:   pm.SyncOnCommit,
 	}, nil
 }
+
+// ToPullMirror convert from repo_model.Mirror and remoteAddress to api.TopicResponse
+func ToPullMirror(ctx context.Context, pm *repo_model.Mirror) (*api.PullMirror, error) {
+	repo := pm.GetRepository(ctx)
+	return &api.PullMirror{
+		RepoName:       repo.Name,
+		MirrorAddress:  pm.RemoteAddress,
+		Interval:       pm.Interval.String(),
+		NextUpdateUnix: pm.NextUpdateUnix.AsTimePtr(),
+		EnablePrune:    pm.EnablePrune,
+		LFS:            pm.LFS,
+		LFSEndpoint:    pm.LFSEndpoint,
+	}, nil
+}
